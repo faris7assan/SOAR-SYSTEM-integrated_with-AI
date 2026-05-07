@@ -1,0 +1,13 @@
+scapy~=2.5.0
+fastapi~=0.115.0
+uvicorn[standard]~=0.30.0
+PyJWT~=2.9.0
+pydantic~=2.8.2
+numpy==1.26.4
+matplotlib~=3.9.2
+pandas~=2.2.3
+pysimplegui~=5.0.0
+# Optional for API docs
+aiofiles~=24.1.0
+# Optional for HTTP requests
+aiohttp~=3.10.5

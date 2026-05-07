@@ -1,0 +1,1185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AegisNDR – SOC Dashboard</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg:        #0a0e1a;
+      --panel:     #0f1629;
+      --border:    #1e2d4a;
+      --accent:    #00d4ff;
+      --accent2:   #7c3aed;
+      --green:     #00ff88;
+      --red:       #ff3b5c;
+      --orange:    #ff8c00;
+      --yellow:    #ffd700;
+      --text:      #c8d8f0;
+      --muted:     #4a6080;
+      --crit:      #ff3b5c;
+      --high:      #ff8c00;
+      --med:       #ffd700;
+      --low:       #00ff88;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', 'Consolas', monospace;
+      font-size: 13px;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 24px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; z-index: 100;
+    }
+    .logo {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .logo-icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    .logo h1 { font-size: 18px; font-weight: 700; color: #fff; }
+    .logo span { font-size: 11px; color: var(--muted); }
+    .header-right { display: flex; align-items: center; gap: 16px; }
+    .status-pill {
+      display: flex; align-items: center; gap: 6px;
+      background: rgba(0,255,136,0.08);
+      border: 1px solid rgba(0,255,136,0.2);
+      padding: 4px 12px; border-radius: 20px; font-size: 11px;
+    }
+    .pulse {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--green);
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity:1; box-shadow: 0 0 6px var(--green); }
+      50%      { opacity:0.4; box-shadow: none; }
+    }
+    #clock { font-size: 12px; color: var(--muted); font-family: monospace; }
+    .login-btn {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff; border: none; padding: 6px 16px;
+      border-radius: 6px; cursor: pointer; font-size: 12px;
+    }
+
+    /* ── Layout ── */
+    .main { display: grid; grid-template-columns: 220px 1fr; min-height: calc(100vh - 57px); }
+
+    /* ── Sidebar ── */
+    nav {
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      padding: 16px 0;
+    }
+    .nav-section { padding: 6px 16px 4px; font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 20px; cursor: pointer;
+      color: var(--muted); font-size: 13px;
+      border-left: 3px solid transparent;
+      transition: all 0.2s;
+    }
+    .nav-item:hover, .nav-item.active {
+      color: var(--accent); background: rgba(0,212,255,0.05);
+      border-left-color: var(--accent);
+    }
+    .nav-badge {
+      margin-left: auto;
+      background: var(--red); color: #fff;
+      font-size: 10px; padding: 1px 6px; border-radius: 8px;
+    }
+
+    /* ── Content ── */
+    .content { padding: 20px; overflow-y: auto; }
+
+    /* ── Views ── */
+    .view { display: none; }
+    .view.active { display: block; }
+
+    /* ── KPI Row ── */
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px; margin-bottom: 20px;
+    }
+    .kpi {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 18px;
+      position: relative; overflow: hidden;
+    }
+    .kpi::before {
+      content: '';
+      position: absolute; top:0; left:0; right:0; height:2px;
+    }
+    .kpi.crit::before  { background: var(--crit); }
+    .kpi.high::before  { background: var(--high); }
+    .kpi.med::before   { background: var(--med);  }
+    .kpi.ok::before    { background: var(--green); }
+    .kpi-label  { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+    .kpi-value  { font-size: 28px; font-weight: 700; color: #fff; }
+    .kpi-sub    { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    .kpi-icon   { position: absolute; right: 14px; top: 14px; font-size: 24px; opacity: 0.15; }
+
+    /* ── Grid 2-col ── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+
+    /* ── Panel ── */
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .panel-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .panel-title { font-size: 13px; font-weight: 600; color: #fff; }
+    .panel-body  { padding: 16px; }
+    .panel-action {
+      font-size: 11px; color: var(--accent); cursor: pointer;
+      background: rgba(0,212,255,0.08); border: 1px solid rgba(0,212,255,0.2);
+      padding: 3px 10px; border-radius: 5px;
+    }
+
+    /* ── Alert Table ── */
+    .alert-table { width: 100%; border-collapse: collapse; }
+    .alert-table th {
+      padding: 8px 12px; text-align: left;
+      font-size: 10px; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.5px;
+      border-bottom: 1px solid var(--border);
+    }
+    .alert-table td {
+      padding: 9px 12px;
+      border-bottom: 1px solid rgba(30,45,74,0.5);
+      font-size: 12px;
+    }
+    .alert-table tr:hover td { background: rgba(0,212,255,0.03); }
+    .badge {
+      display: inline-block; padding: 2px 8px;
+      border-radius: 5px; font-size: 10px; font-weight: 600;
+    }
+    .badge.CRITICAL { background: rgba(255,59,92,0.15); color: var(--crit); border: 1px solid rgba(255,59,92,0.3); }
+    .badge.HIGH     { background: rgba(255,140,0,0.15); color: var(--high); border: 1px solid rgba(255,140,0,0.3); }
+    .badge.MEDIUM   { background: rgba(255,215,0,0.1);  color: var(--med);  border: 1px solid rgba(255,215,0,0.25); }
+    .badge.LOW      { background: rgba(0,255,136,0.08); color: var(--low);  border: 1px solid rgba(0,255,136,0.2); }
+
+    /* ── Score bar ── */
+    .score-bar { width: 100%; background: rgba(255,255,255,0.06); border-radius: 3px; height: 5px; }
+    .score-fill { height: 5px; border-radius: 3px; }
+
+    /* ── MITRE tags ── */
+    .mitre-tag {
+      display: inline-block;
+      background: rgba(124,58,237,0.15); color: #a78bfa;
+      border: 1px solid rgba(124,58,237,0.3);
+      padding: 2px 7px; border-radius: 4px; font-size: 10px;
+      margin-right: 4px;
+    }
+
+    /* ── IP field ── */
+    .ip-mono { font-family: monospace; color: var(--accent); font-size: 12px; }
+    .ip-blocked { color: var(--red); text-decoration: line-through; }
+
+    /* ── Chain card ── */
+    .chain-card {
+      background: rgba(124,58,237,0.06);
+      border: 1px solid rgba(124,58,237,0.2);
+      border-radius: 8px; padding: 14px; margin-bottom: 10px;
+    }
+    .chain-stages { display: flex; align-items: center; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+    .chain-stage {
+      background: rgba(0,212,255,0.1); border: 1px solid rgba(0,212,255,0.2);
+      padding: 3px 10px; border-radius: 5px; font-size: 11px; color: var(--accent);
+    }
+    .chain-arrow { color: var(--muted); font-size: 12px; }
+
+    /* ── Blocked IP pill ── */
+    .blocked-pill {
+      display: flex; align-items: center; justify-content: space-between;
+      background: rgba(255,59,92,0.06);
+      border: 1px solid rgba(255,59,92,0.15);
+      border-radius: 7px; padding: 8px 12px; margin-bottom: 8px;
+    }
+    .blocked-pill button {
+      background: transparent; border: 1px solid rgba(255,59,92,0.3);
+      color: var(--red); padding: 2px 8px; border-radius: 4px;
+      cursor: pointer; font-size: 10px;
+    }
+
+    /* ── Login modal ── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.7); z-index: 1000;
+      align-items: center; justify-content: center;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 12px; padding: 32px; width: 340px;
+    }
+    .modal h2 { font-size: 18px; color: #fff; margin-bottom: 20px; text-align: center; }
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 5px; }
+    .form-group input {
+      width: 100%; background: rgba(255,255,255,0.05);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 9px 12px; color: #fff; font-size: 13px;
+      outline: none;
+    }
+    .form-group input:focus { border-color: var(--accent); }
+    .btn-submit {
+      width: 100%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: #fff; border: none; padding: 10px; border-radius: 8px;
+      font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 8px;
+    }
+    .login-hint { font-size: 11px; color: var(--muted); text-align: center; margin-top: 12px; }
+    #login-error { color: var(--red); font-size: 12px; text-align: center; margin-top: 8px; display: none; }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px;
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 8px; padding: 12px 18px;
+      font-size: 13px; z-index: 9999;
+      animation: fadeIn 0.3s ease;
+      max-width: 320px;
+    }
+    @keyframes fadeIn { from { opacity:0; transform: translateY(10px); } }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    .section-title {
+      font-size: 11px; text-transform: uppercase;
+      letter-spacing: 1px; color: var(--muted);
+      margin-bottom: 12px; margin-top: 18px;
+    }
+    canvas { max-height: 220px; }
+  </style>
+</head>
+<body>
+
+<!-- Login Modal -->
+<div class="modal-overlay open" id="login-modal">
+  <div class="modal">
+    <div style="text-align:center;margin-bottom:16px">
+      <div style="width:52px;height:52px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:14px;display:inline-flex;align-items:center;justify-content:center;font-size:26px;margin-bottom:10px">🛡️</div>
+      <h2 style="margin:0">AegisNDR</h2>
+      <p style="font-size:12px;color:var(--muted)">SOC Dashboard</p>
+    </div>
+    <div class="form-group">
+      <label>USERNAME</label>
+      <input type="text" id="login-user" value="admin" placeholder="admin" />
+    </div>
+    <div class="form-group">
+      <label>PASSWORD</label>
+      <input type="password" id="login-pass" value="aegis2024!" placeholder="••••••••" />
+    </div>
+    <button class="btn-submit" onclick="doLogin()">Sign In</button>
+    <div id="login-error">Invalid credentials</div>
+    <div class="login-hint">Demo: admin / aegis2024!  |  analyst / analyst123</div>
+  </div>
+</div>
+
+<!-- Header -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🛡️</div>
+    <div>
+      <h1>AegisNDR</h1>
+      <span>Network Detection & Response</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill">
+      <div class="pulse"></div>
+      <span>LIVE MONITORING</span>
+    </div>
+    <span id="clock">--:--:--</span>
+    <button class="login-btn" onclick="logout()">Logout</button>
+  </div>
+</header>
+
+<div class="main">
+  <!-- Sidebar -->
+  <nav>
+    <div class="nav-section">Monitor</div>
+    <div class="nav-item active" onclick="showView('overview')">📊 Overview</div>
+    <div class="nav-item" onclick="showView('alerts')">
+      🚨 Alerts <span class="nav-badge" id="alert-badge">0</span>
+    </div>
+    <div class="nav-item" onclick="showView('flows')">🌊 Traffic Flows</div>
+
+    <div class="nav-section">Detection</div>
+    <div class="nav-item" onclick="showView('chains')">🔗 Attack Chains</div>
+    <div class="nav-item" onclick="showView('threats')">🎯 Threat Scores</div>
+    <div class="nav-item" onclick="showView('intel')">🌐 Threat Intel</div>
+
+    <div class="nav-section">Response</div>
+    <div class="nav-item" onclick="showView('blocked')">🚫 Blocked IPs</div>
+    <div class="nav-item" onclick="showView('response-log')">📋 Action Log</div>
+
+    <div class="nav-section">System</div>
+    <div class="nav-item" onclick="showView('simulate')">⚔️ Simulation</div>
+    <div class="nav-item" onclick="showView('settings')">⚙️ Settings</div>
+  </nav>
+
+  <!-- Content -->
+  <div class="content">
+
+    <!-- ── OVERVIEW ── -->
+    <div class="view active" id="view-overview">
+      <div class="kpi-row">
+        <div class="kpi crit">
+          <div class="kpi-icon">🔴</div>
+          <div class="kpi-label">Critical Alerts</div>
+          <div class="kpi-value" id="kpi-critical">0</div>
+          <div class="kpi-sub">Last 60 min</div>
+        </div>
+        <div class="kpi high">
+          <div class="kpi-icon">🟠</div>
+          <div class="kpi-label">High Alerts</div>
+          <div class="kpi-value" id="kpi-high">0</div>
+          <div class="kpi-sub">Last 60 min</div>
+        </div>
+        <div class="kpi ok">
+          <div class="kpi-icon">🌊</div>
+          <div class="kpi-label">Active Flows</div>
+          <div class="kpi-value" id="kpi-flows">0</div>
+          <div class="kpi-sub">Total recorded</div>
+        </div>
+        <div class="kpi med">
+          <div class="kpi-icon">🔗</div>
+          <div class="kpi-label">Attack Chains</div>
+          <div class="kpi-value" id="kpi-chains">0</div>
+          <div class="kpi-sub">Active</div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <!-- Timeline chart -->
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">📈 Alert Timeline (60 min)</span>
+          </div>
+          <div class="panel-body">
+            <canvas id="timeline-chart"></canvas>
+          </div>
+        </div>
+        <!-- Type distribution -->
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">🥧 Alert Type Distribution</span>
+          </div>
+          <div class="panel-body">
+            <canvas id="type-chart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <!-- Top threats -->
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">🎯 Top Threat IPs</span>
+            <span class="panel-action" onclick="showView('threats')">View All</span>
+          </div>
+          <div class="panel-body" id="top-threats-list">
+            <p style="color:var(--muted);font-size:12px">Loading...</p>
+          </div>
+        </div>
+        <!-- Recent alerts -->
+        <div class="panel">
+          <div class="panel-header">
+            <span class="panel-title">🚨 Recent Alerts</span>
+            <span class="panel-action" onclick="showView('alerts')">View All</span>
+          </div>
+          <div class="panel-body" style="padding:0">
+            <table class="alert-table">
+              <thead><tr>
+                <th>Severity</th><th>Type</th><th>Source</th><th>Score</th>
+              </tr></thead>
+              <tbody id="recent-alerts-body">
+                <tr><td colspan="4" style="color:var(--muted);text-align:center;padding:20px">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ALERTS ── -->
+    <div class="view" id="view-alerts">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+        <h2 style="color:#fff;font-size:16px">🚨 Alerts</h2>
+        <select id="filter-severity" onchange="loadAlerts()" style="background:var(--panel);border:1px solid var(--border);color:var(--text);padding:5px 10px;border-radius:6px;font-size:12px">
+          <option value="">All Severities</option>
+          <option value="CRITICAL">Critical</option>
+          <option value="HIGH">High</option>
+          <option value="MEDIUM">Medium</option>
+          <option value="LOW">Low</option>
+        </select>
+        <select id="filter-type" onchange="loadAlerts()" style="background:var(--panel);border:1px solid var(--border);color:var(--text);padding:5px 10px;border-radius:6px;font-size:12px">
+          <option value="">All Types</option>
+          <option value="PORT_SCAN">Port Scan</option>
+          <option value="BRUTE_FORCE">Brute Force</option>
+          <option value="DDOS">DDoS</option>
+          <option value="DATA_EXFIL">Data Exfil</option>
+          <option value="BEACON">Beaconing</option>
+          <option value="SQL_INJECTION">SQL Injection</option>
+          <option value="XSS">XSS</option>
+          <option value="ANOMALY">ML Anomaly</option>
+        </select>
+        <button onclick="loadAlerts()" style="background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);color:var(--accent);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px">🔄 Refresh</button>
+      </div>
+      <div class="panel">
+        <div class="panel-body" style="padding:0">
+          <table class="alert-table" style="width:100%">
+            <thead><tr>
+              <th>Time</th><th>Severity</th><th>Type</th>
+              <th>Source IP</th><th>Target</th><th>Score</th>
+              <th>MITRE</th><th>Description</th>
+            </tr></thead>
+            <tbody id="alerts-tbody">
+              <tr><td colspan="8" style="color:var(--muted);text-align:center;padding:30px">Loading alerts...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── FLOWS ── -->
+    <div class="view" id="view-flows">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <h2 style="color:#fff;font-size:16px">🌊 Traffic Flows</h2>
+        <button onclick="loadFlows()" style="background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);color:var(--accent);padding:5px 12px;border-radius:6px;cursor:pointer;font-size:12px">🔄 Refresh</button>
+      </div>
+      <div class="grid-2" style="margin-bottom:16px">
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">🔊 Top Talkers (by bytes)</span></div>
+          <div class="panel-body" id="top-talkers">Loading...</div>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">📊 Protocol Distribution</span></div>
+          <div class="panel-body"><canvas id="proto-chart"></canvas></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-body" style="padding:0">
+          <table class="alert-table">
+            <thead><tr>
+              <th>Flow ID</th><th>Source</th><th>Destination</th>
+              <th>Proto</th><th>Packets</th><th>Bytes</th><th>Duration</th>
+            </tr></thead>
+            <tbody id="flows-tbody">
+              <tr><td colspan="7" style="color:var(--muted);text-align:center;padding:30px">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── ATTACK CHAINS ── -->
+    <div class="view" id="view-chains">
+      <h2 style="color:#fff;font-size:16px;margin-bottom:16px">🔗 Attack Chain Correlation</h2>
+      <div class="panel" style="margin-bottom:16px">
+        <div class="panel-header"><span class="panel-title">Active Kill Chains</span></div>
+        <div class="panel-body" id="chains-active">
+          <p style="color:var(--muted)">No active attack chains detected.</p>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-header"><span class="panel-title">Completed / Historical Chains</span></div>
+        <div class="panel-body" id="chains-history">
+          <p style="color:var(--muted)">No historical chains.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── THREATS ── -->
+    <div class="view" id="view-threats">
+      <h2 style="color:#fff;font-size:16px;margin-bottom:16px">🎯 Threat Score Leaderboard</h2>
+      <div class="panel">
+        <div class="panel-body" style="padding:0">
+          <table class="alert-table">
+            <thead><tr>
+              <th>IP Address</th><th>Score</th><th>Severity</th>
+              <th>Alert Count</th><th>Last Alert Type</th><th>Actions</th>
+            </tr></thead>
+            <tbody id="threats-tbody">
+              <tr><td colspan="6" style="color:var(--muted);text-align:center;padding:30px">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── THREAT INTEL ── -->
+    <div class="view" id="view-intel">
+      <h2 style="color:#fff;font-size:16px;margin-bottom:16px">🌐 Threat Intelligence Lookup</h2>
+      <div class="panel" style="margin-bottom:16px">
+        <div class="panel-body" style="display:flex;gap:10px">
+          <input type="text" id="intel-ip" placeholder="Enter IP address (e.g. 10.0.0.99)"
+            style="flex:1;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:6px;padding:9px 12px;color:#fff;font-size:13px;outline:none" />
+          <button onclick="lookupIP()" class="btn-submit" style="width:auto;padding:9px 20px">Lookup</button>
+        </div>
+      </div>
+      <div class="panel" id="intel-result" style="display:none">
+        <div class="panel-header"><span class="panel-title">Intelligence Report</span></div>
+        <div class="panel-body" id="intel-body"></div>
+      </div>
+    </div>
+
+    <!-- ── BLOCKED IPs ── -->
+    <div class="view" id="view-blocked">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <h2 style="color:#fff;font-size:16px">🚫 Blocked IPs</h2>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="manual-block-ip" placeholder="IP to block"
+            style="background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:6px;padding:6px 12px;color:#fff;font-size:12px;outline:none;width:160px" />
+          <button onclick="manualBlock()" style="background:rgba(255,59,92,0.15);border:1px solid rgba(255,59,92,0.3);color:var(--red);padding:6px 14px;border-radius:6px;cursor:pointer;font-size:12px">Block IP</button>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-body" id="blocked-list">
+          <p style="color:var(--muted)">No IPs currently blocked.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── RESPONSE LOG ── -->
+    <div class="view" id="view-response-log">
+      <h2 style="color:#fff;font-size:16px;margin-bottom:16px">📋 Response Action Log</h2>
+      <div class="panel">
+        <div class="panel-body" style="padding:0">
+          <table class="alert-table">
+            <thead><tr><th>Time</th><th>Action</th><th>Target IP</th><th>Status</th><th>Message</th></tr></thead>
+            <tbody id="response-log-tbody">
+              <tr><td colspan="5" style="color:var(--muted);text-align:center;padding:30px">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SIMULATION ── -->
+    <div class="view" id="view-simulate">
+      <h2 style="color:#fff;font-size:16px;margin-bottom:16px">⚔️ Attack Simulation Console</h2>
+      <div class="grid-2">
+        <div style="display:flex;flex-direction:column;gap:12px">
+          <div class="panel">
+            <div class="panel-header"><span class="panel-title">Available Simulations</span></div>
+            <div class="panel-body" style="display:flex;flex-direction:column;gap:8px">
+              <button class="sim-btn" onclick="runSim('port_scan')">🔍 Port Scan</button>
+              <button class="sim-btn" onclick="runSim('brute_force')">🔐 Brute Force (SSH)</button>
+              <button class="sim-btn" onclick="runSim('ddos')">💥 DDoS Flood</button>
+              <button class="sim-btn" onclick="runSim('exfil')">📤 Data Exfiltration</button>
+              <button class="sim-btn" onclick="runSim('beacon')">📡 C2 Beaconing</button>
+              <button class="sim-btn" onclick="runSim('sqli')">💉 SQL Injection</button>
+              <button class="sim-btn" onclick="runSim('dns_tunnel')">🌐 DNS Tunneling</button>
+              <button class="sim-btn" onclick="runSim('lateral')">↔️ Lateral Movement</button>
+              <button class="sim-btn" onclick="runSim('all')" style="background:rgba(124,58,237,0.2);border-color:rgba(124,58,237,0.4);color:#a78bfa">⚡ Run All Attacks</button>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">Simulation Log</span></div>
+          <div class="panel-body" id="sim-log" style="height:380px;overflow-y:auto;font-family:monospace;font-size:11px;line-height:1.7">
+            <span style="color:var(--muted)">Ready. Click a simulation to inject attack traffic...</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SETTINGS ── -->
+    <div class="view" id="view-settings">
+      <h2 style="color:#fff;font-size:16px;margin-bottom:16px">⚙️ System Settings</h2>
+      <div class="grid-2">
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">API Configuration</span></div>
+          <div class="panel-body">
+            <div style="margin-bottom:12px">
+              <div style="font-size:11px;color:var(--muted);margin-bottom:4px">API BASE URL</div>
+              <input id="api-base-url" type="text" value="http://localhost:8000"
+                style="width:100%;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:6px;padding:8px 12px;color:#fff;font-size:12px;outline:none" />
+            </div>
+            <button onclick="saveSettings()" class="btn-submit" style="padding:8px">Save Settings</button>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><span class="panel-title">System Status</span></div>
+          <div class="panel-body" id="sys-status">
+            <p style="color:var(--muted)">Loading...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /main -->
+
+<style>
+.sim-btn {
+  background: rgba(0,212,255,0.08); border: 1px solid rgba(0,212,255,0.2);
+  color: var(--accent); padding: 9px 14px; border-radius: 7px;
+  cursor: pointer; font-size: 12px; text-align: left;
+  transition: background 0.2s;
+}
+.sim-btn:hover { background: rgba(0,212,255,0.15); }
+</style>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let token     = localStorage.getItem("aegis_token") || "";
+let userRole  = localStorage.getItem("aegis_role")  || "";
+let apiBase   = localStorage.getItem("aegis_api")   || "http://localhost:8000";
+
+let tlChart   = null;
+let typeChart = null;
+let protoChart = null;
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+const api = async (path, opts = {}) => {
+  const res = await fetch(apiBase + path, {
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    ...opts,
+  });
+  if (res.status === 401) { logout(); return null; }
+  return res.ok ? res.json() : null;
+};
+
+const fmt = ts => new Date(ts * 1000).toLocaleTimeString();
+const fmtBytes = b => b > 1e6 ? (b/1e6).toFixed(1)+"MB" : b > 1e3 ? (b/1e3).toFixed(1)+"KB" : b+"B";
+
+const scoreColor = s =>
+  s >= 80 ? "var(--crit)" : s >= 60 ? "var(--high)" : s >= 40 ? "var(--med)" : "var(--low)";
+
+// ── Clock ──────────────────────────────────────────────────────────────────
+setInterval(() => {
+  document.getElementById("clock").textContent = new Date().toLocaleTimeString();
+}, 1000);
+
+// ── Login / Logout ─────────────────────────────────────────────────────────
+async function doLogin() {
+  const u = document.getElementById("login-user").value;
+  const p = document.getElementById("login-pass").value;
+  const res = await fetch(apiBase + "/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username: u, password: p }),
+  });
+  if (res.ok) {
+    const data = await res.json();
+    token    = data.access_token;
+    userRole = data.role;
+    localStorage.setItem("aegis_token", token);
+    localStorage.setItem("aegis_role", userRole);
+    document.getElementById("login-modal").classList.remove("open");
+    startDashboard();
+  } else {
+    document.getElementById("login-error").style.display = "block";
+  }
+}
+
+function logout() {
+  token = ""; userRole = "";
+  localStorage.removeItem("aegis_token");
+  localStorage.removeItem("aegis_role");
+  document.getElementById("login-modal").classList.add("open");
+}
+
+if (token) {
+  document.getElementById("login-modal").classList.remove("open");
+  startDashboard();
+}
+
+// ── View Router ────────────────────────────────────────────────────────────
+function showView(name) {
+  document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+  document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+  document.getElementById("view-" + name)?.classList.add("active");
+  document.querySelectorAll(".nav-item").forEach(n => {
+    if (n.textContent.toLowerCase().includes(name.replace("-"," "))) n.classList.add("active");
+  });
+
+  // Load data for view
+  if (name === "alerts")       loadAlerts();
+  if (name === "flows")        loadFlows();
+  if (name === "chains")       loadChains();
+  if (name === "threats")      loadThreats();
+  if (name === "blocked")      loadBlocked();
+  if (name === "response-log") loadResponseLog();
+  if (name === "settings")     loadSystemStatus();
+}
+
+// ── Dashboard Bootstrap ────────────────────────────────────────────────────
+function startDashboard() {
+  initCharts();
+  refreshOverview();
+  setInterval(refreshOverview, 15000);
+}
+
+// ── Overview ───────────────────────────────────────────────────────────────
+async function refreshOverview() {
+  // Stats
+  const stats   = await api("/stats");
+  const chains  = await api("/chains/active");
+  const threats = await api("/threat_score?n=5");
+  const timeline= await api("/alerts/timeline?minutes=60&bucket_size=5");
+  const recent  = await api("/alerts/recent?minutes=10");
+
+  if (!stats) return;
+
+  // KPIs
+  const bySev = stats.alerts?.by_severity || {};
+  document.getElementById("kpi-critical").textContent = bySev.CRITICAL || 0;
+  document.getElementById("kpi-high").textContent     = bySev.HIGH     || 0;
+  document.getElementById("kpi-flows").textContent    = stats.flows?.total_flows || 0;
+  document.getElementById("kpi-chains").textContent   = (chains || []).length;
+
+  const totalAlerts = (stats.alerts?.total_in_memory || 0);
+  document.getElementById("alert-badge").textContent = totalAlerts;
+
+  // Timeline chart
+  if (timeline && tlChart) {
+    tlChart.data.labels    = timeline.map(t => t.time);
+    tlChart.data.datasets[0].data = timeline.map(t => t.count);
+    tlChart.update();
+  }
+
+  // Type chart
+  if (typeChart) {
+    const byType = stats.alerts?.by_type || {};
+    const labels = Object.keys(byType);
+    const vals   = Object.values(byType);
+    typeChart.data.labels            = labels;
+    typeChart.data.datasets[0].data  = vals;
+    typeChart.update();
+  }
+
+  // Top threats
+  if (threats) {
+    document.getElementById("top-threats-list").innerHTML = threats.map(t => `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div>
+          <span class="ip-mono">${t.ip}</span>
+          <div style="font-size:10px;color:var(--muted)">${t.alert_count} alerts · ${t.last_type}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:16px;font-weight:700;color:${scoreColor(t.score)}">${t.score}</div>
+          <div class="score-bar" style="width:80px">
+            <div class="score-fill" style="width:${t.score}%;background:${scoreColor(t.score)}"></div>
+          </div>
+        </div>
+      </div>
+    `).join("") || "<p style='color:var(--muted)'>No threats detected yet.</p>";
+  }
+
+  // Recent alerts
+  if (recent) {
+    const tbody = document.getElementById("recent-alerts-body");
+    tbody.innerHTML = recent.slice(0,8).map(a => `
+      <tr>
+        <td><span class="badge ${a.severity}">${a.severity}</span></td>
+        <td style="font-size:11px">${a.alert_type}</td>
+        <td class="ip-mono">${a.src_ip}</td>
+        <td style="color:${scoreColor(a.score)};font-weight:600">${a.score}</td>
+      </tr>
+    `).join("") || `<tr><td colspan="4" style="color:var(--muted);text-align:center;padding:16px">No recent alerts</td></tr>`;
+  }
+}
+
+// ── Alerts ────────────────────────────────────────────────────────────────
+async function loadAlerts() {
+  const sev  = document.getElementById("filter-severity").value;
+  const type = document.getElementById("filter-type").value;
+  let url    = "/alerts?limit=100";
+  if (sev)  url += `&severity=${sev}`;
+  if (type) url += `&alert_type=${type}`;
+
+  const alerts = await api(url);
+  const tbody  = document.getElementById("alerts-tbody");
+  if (!alerts || !alerts.length) {
+    tbody.innerHTML = `<tr><td colspan="8" style="color:var(--muted);text-align:center;padding:30px">No alerts found</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = alerts.map(a => `
+    <tr>
+      <td style="font-size:10px;color:var(--muted)">${fmt(a.timestamp)}</td>
+      <td><span class="badge ${a.severity}">${a.severity}</span></td>
+      <td style="font-size:11px">${a.alert_type.replace("_"," ")}</td>
+      <td class="ip-mono">${a.src_ip}</td>
+      <td style="font-size:11px">${a.dst_ip}:${a.dst_port}</td>
+      <td>
+        <span style="color:${scoreColor(a.score)};font-weight:700">${a.score}</span>
+        <div class="score-bar"><div class="score-fill" style="width:${a.score}%;background:${scoreColor(a.score)}"></div></div>
+      </td>
+      <td>${a.mitre?.technique ? `<span class="mitre-tag">${a.mitre.technique.split(" ")[0]}</span>` : ""}</td>
+      <td style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${a.description}">${a.description}</td>
+    </tr>
+  `).join("");
+}
+
+// ── Flows ─────────────────────────────────────────────────────────────────
+async function loadFlows() {
+  const [flows, talkers, stats] = await Promise.all([
+    api("/flows?limit=50"),
+    api("/flows/top-talkers?n=8"),
+    api("/stats"),
+  ]);
+
+  // Top talkers
+  const talkersEl = document.getElementById("top-talkers");
+  if (talkers) {
+    talkersEl.innerHTML = talkers.map(t => `
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+        <span class="ip-mono">${t.ip}</span>
+        <span style="color:var(--accent)">${fmtBytes(t.bytes)}</span>
+      </div>
+    `).join("");
+  }
+
+  // Proto chart
+  if (protoChart && stats?.flows?.by_protocol) {
+    const bp = stats.flows.by_protocol;
+    protoChart.data.labels           = Object.keys(bp);
+    protoChart.data.datasets[0].data = Object.values(bp);
+    protoChart.update();
+  }
+
+  // Flows table
+  const tbody = document.getElementById("flows-tbody");
+  if (!flows?.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:30px">No flows yet</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = flows.map(f => `
+    <tr>
+      <td style="font-family:monospace;font-size:11px;color:var(--muted)">${f.flow_id}</td>
+      <td class="ip-mono">${f.src_ip}:${f.src_port}</td>
+      <td class="ip-mono">${f.dst_ip}:${f.dst_port}</td>
+      <td><span style="background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);padding:1px 7px;border-radius:4px;font-size:10px">${f.protocol}</span></td>
+      <td>${f.total_packets}</td>
+      <td>${fmtBytes(f.total_bytes)}</td>
+      <td>${f.duration.toFixed(2)}s</td>
+    </tr>
+  `).join("");
+}
+
+// ── Chains ────────────────────────────────────────────────────────────────
+async function loadChains() {
+  const [active, history] = await Promise.all([
+    api("/chains/active"),
+    api("/chains/history"),
+  ]);
+
+  const renderChain = c => `
+    <div class="chain-card">
+      <div style="display:flex;justify-content:space-between">
+        <div>
+          <span style="color:#a78bfa;font-size:11px;font-family:monospace">CHAIN #${c.chain_id}</span>
+          <span class="ip-mono" style="margin-left:10px">${c.src_ip}</span>
+        </div>
+        <span class="badge ${c.chain_score >= 80 ? "CRITICAL" : c.chain_score >= 60 ? "HIGH" : "MEDIUM"}">
+          Score: ${c.chain_score}
+        </span>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">
+        Phase: <span style="color:#a78bfa">${c.kill_chain_phase}</span> · ${c.stage_count} stages
+      </div>
+      <div class="chain-stages">
+        ${c.stage_names.map((s,i) => `
+          ${i > 0 ? '<span class="chain-arrow">→</span>' : ''}
+          <span class="chain-stage">${s.replace("_"," ")}</span>
+        `).join("")}
+      </div>
+    </div>
+  `;
+
+  document.getElementById("chains-active").innerHTML =
+    (active?.length ? active.map(renderChain).join("") : "<p style='color:var(--muted)'>No active chains.</p>");
+
+  document.getElementById("chains-history").innerHTML =
+    (history?.length ? history.map(renderChain).join("") : "<p style='color:var(--muted)'>No historical chains.</p>");
+}
+
+// ── Threats ───────────────────────────────────────────────────────────────
+async function loadThreats() {
+  const threats = await api("/threat_score?n=30");
+  const tbody   = document.getElementById("threats-tbody");
+  if (!threats?.length) {
+    tbody.innerHTML = `<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:30px">No threats scored yet</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = threats.map(t => `
+    <tr>
+      <td class="ip-mono">${t.ip}</td>
+      <td>
+        <span style="color:${scoreColor(t.score)};font-weight:700;font-size:15px">${t.score}</span>
+        <div class="score-bar" style="width:100px"><div class="score-fill" style="width:${t.score}%;background:${scoreColor(t.score)}"></div></div>
+      </td>
+      <td><span class="badge ${t.severity}">${t.severity}</span></td>
+      <td>${t.alert_count}</td>
+      <td style="font-size:11px">${t.last_type}</td>
+      <td>
+        <button onclick="blockFromThreats('${t.ip}')"
+          style="background:rgba(255,59,92,0.1);border:1px solid rgba(255,59,92,0.3);color:var(--red);padding:3px 10px;border-radius:5px;cursor:pointer;font-size:11px">
+          Block
+        </button>
+      </td>
+    </tr>
+  `).join("");
+}
+
+async function blockFromThreats(ip) {
+  if (!confirm(`Block ${ip}?`)) return;
+  const res = await api("/block_ip", {
+    method: "POST",
+    body: JSON.stringify({ ip }),
+  });
+  showToast(res?.success ? `✅ Blocked ${ip}` : `❌ Could not block ${ip}`);
+}
+
+// ── Threat Intel ──────────────────────────────────────────────────────────
+async function lookupIP() {
+  const ip = document.getElementById("intel-ip").value.trim();
+  if (!ip) return;
+  const data = await api(`/intel/${ip}`);
+  const el   = document.getElementById("intel-result");
+  const body = document.getElementById("intel-body");
+  el.style.display = "block";
+  if (!data) { body.innerHTML = `<p style="color:var(--red)">Lookup failed</p>`; return; }
+
+  const score = data.reputation_score || 0;
+  body.innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div>
+        <div style="font-size:11px;color:var(--muted)">IP ADDRESS</div>
+        <div class="ip-mono" style="font-size:18px">${data.ip}</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--muted)">REPUTATION SCORE</div>
+        <div style="font-size:24px;font-weight:700;color:${scoreColor(score)}">${score}</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--muted)">BLACKLISTED</div>
+        <div style="color:${data.is_blacklisted ? "var(--red)" : "var(--green)"}">${data.is_blacklisted ? "YES ⚠️" : "No ✓"}</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--muted)">TOR EXIT NODE</div>
+        <div style="color:${data.is_tor ? "var(--orange)" : "var(--green)"}">${data.is_tor ? "YES" : "No"}</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--muted)">KNOWN C2</div>
+        <div style="color:${data.is_c2 ? "var(--red)" : "var(--green)"}">${data.is_c2 ? "YES ⚠️" : "No ✓"}</div>
+      </div>
+      <div>
+        <div style="font-size:11px;color:var(--muted)">CATEGORIES</div>
+        <div>${(data.categories || []).map(c => `<span class="mitre-tag">${c}</span>`).join("")||"—"}</div>
+      </div>
+    </div>
+  `;
+}
+
+// ── Blocked IPs ───────────────────────────────────────────────────────────
+async function loadBlocked() {
+  const blocked = await api("/blocked_ips");
+  const el = document.getElementById("blocked-list");
+  if (!blocked?.length) {
+    el.innerHTML = `<p style="color:var(--muted)">No IPs currently blocked.</p>`;
+    return;
+  }
+  el.innerHTML = blocked.map(b => `
+    <div class="blocked-pill">
+      <div>
+        <span class="ip-mono ip-blocked">${b.ip}</span>
+        <span style="font-size:10px;color:var(--muted);margin-left:10px">Expires in ${b.expires_in}s</span>
+      </div>
+      <button onclick="unblockIP('${b.ip}')">Unblock</button>
+    </div>
+  `).join("");
+}
+
+async function manualBlock() {
+  const ip = document.getElementById("manual-block-ip").value.trim();
+  if (!ip) return;
+  const res = await api("/block_ip", { method: "POST", body: JSON.stringify({ ip }) });
+  showToast(res?.success ? `✅ Blocked ${ip}` : `❌ Block failed`);
+  loadBlocked();
+}
+
+async function unblockIP(ip) {
+  await api(`/block_ip/${ip}`, { method: "DELETE" });
+  showToast(`✅ Unblocked ${ip}`);
+  loadBlocked();
+}
+
+// ── Response Log ──────────────────────────────────────────────────────────
+async function loadResponseLog() {
+  const log   = await api("/response/log");
+  const tbody = document.getElementById("response-log-tbody");
+  if (!log?.length) {
+    tbody.innerHTML = `<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:30px">No actions logged</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = log.reverse().map(a => `
+    <tr>
+      <td style="font-size:10px;color:var(--muted)">${fmt(a.timestamp)}</td>
+      <td><span style="background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);padding:2px 8px;border-radius:4px;font-size:10px">${a.action_type}</span></td>
+      <td class="ip-mono">${a.target_ip}</td>
+      <td style="color:${a.success ? "var(--green)" : "var(--red)"}">${a.success ? "✓ OK" : "✗ FAIL"}</td>
+      <td style="font-size:11px;max-width:250px;overflow:hidden;text-overflow:ellipsis">${a.message}</td>
+    </tr>
+  `).join("");
+}
+
+// ── System Status ─────────────────────────────────────────────────────────
+async function loadSystemStatus() {
+  const stats = await api("/stats");
+  const el    = document.getElementById("sys-status");
+  if (!stats) { el.innerHTML = `<p style="color:var(--red)">API unreachable</p>`; return; }
+  el.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:8px;font-size:12px">
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Total Alerts</span><span>${stats.alerts?.total_inserted||0}</span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Total Flows</span><span>${stats.flows?.total_flows||0}</span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">ML Status</span><span style="color:${stats.ml?.trained?"var(--green)":"var(--orange)}">"${stats.ml?.trained?"Trained":"Training..."}"</span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">ML Samples</span><span>${stats.ml?.samples||0}</span></div>
+      <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Anomalies Found</span><span>${stats.ml?.anomaly_count||0}</span></div>
+    </div>
+  `;
+}
+
+function saveSettings() {
+  apiBase = document.getElementById("api-base-url").value.trim();
+  localStorage.setItem("aegis_api", apiBase);
+  showToast("✅ Settings saved");
+}
+
+// ── Simulation ────────────────────────────────────────────────────────────
+const SIM_MESSAGES = {
+  port_scan:   ["[SIM] Launching TCP SYN port scan 1-1024...", "[SIM] Sending SYN packets to 192.168.1.10...", "[SIM] Port scan complete — 1024 ports probed"],
+  brute_force: ["[SIM] Starting SSH brute force on :22...", "[SIM] Attempting login — admin:password123", "[SIM] Attempting login — root:toor", "[SIM] 50 attempts injected"],
+  ddos:        ["[SIM] Initiating SYN flood from 50 spoofed IPs...", "[SIM] Targeting 192.168.1.1:80", "[SIM] 5000 packets/sec injected"],
+  exfil:       ["[SIM] Simulating data exfiltration...", "[SIM] 60MB outbound to 203.0.113.5:443", "[SIM] Transfer complete"],
+  beacon:      ["[SIM] Starting C2 beacon simulation...", "[SIM] Beaconing to 198.51.100.7 every 30s", "[SIM] 15 beacons injected"],
+  sqli:        ["[SIM] Injecting SQL injection payloads...", "[SIM] Payload: UNION SELECT 1,2,3--", "[SIM] Payload: ' OR 1=1--", "[SIM] 10 payloads sent"],
+  dns_tunnel:  ["[SIM] Simulating DNS tunneling...", "[SIM] Large encoded queries to 8.8.8.8:53", "[SIM] 30 oversized DNS packets sent"],
+  lateral:     ["[SIM] Starting lateral movement scan...", "[SIM] Scanning SMB/RDP on internal /24", "[SIM] 19 hosts scanned"],
+  all:         ["[SIM] ⚡ Running ALL attack simulations...", "[SIM] Port Scan → Brute Force → DDoS → Exfil → Beacon → SQLi → DNS Tunnel → Lateral"]
+};
+
+function runSim(type) {
+  const log   = document.getElementById("sim-log");
+  const msgs  = SIM_MESSAGES[type] || ["[SIM] Unknown simulation"];
+  const color = {
+    port_scan: "var(--accent)", brute_force: "var(--orange)", ddos: "var(--red)",
+    exfil: "var(--yellow)", beacon: "var(--accent2)", sqli: "var(--red)",
+    dns_tunnel: "var(--green)", lateral: "var(--orange)", all: "#a78bfa"
+  }[type] || "var(--accent)";
+
+  msgs.forEach((msg, i) => {
+    setTimeout(() => {
+      const line = document.createElement("div");
+      line.innerHTML = `<span style="color:var(--muted)">[${new Date().toLocaleTimeString()}]</span> <span style="color:${color}">${msg}</span>`;
+      log.appendChild(line);
+      log.scrollTop = log.scrollHeight;
+    }, i * 600);
+  });
+
+  setTimeout(() => {
+    const done = document.createElement("div");
+    done.innerHTML = `<span style="color:var(--muted)">[${new Date().toLocaleTimeString()}]</span> <span style="color:var(--green)">✓ Simulation injected — check Alerts tab</span>`;
+    log.appendChild(done);
+    log.scrollTop = log.scrollHeight;
+  }, msgs.length * 600 + 500);
+}
+
+// ── Charts ────────────────────────────────────────────────────────────────
+function initCharts() {
+  const COLORS = ["#ff3b5c","#ff8c00","#ffd700","#00ff88","#00d4ff","#7c3aed","#ec4899","#10b981"];
+
+  // Timeline
+  tlChart = new Chart(document.getElementById("timeline-chart"), {
+    type: "line",
+    data: {
+      labels: [],
+      datasets: [{
+        label: "Alerts",
+        data: [],
+        borderColor: "#00d4ff",
+        backgroundColor: "rgba(0,212,255,0.08)",
+        fill: true, tension: 0.4, pointRadius: 3,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: "#4a6080", font: { size: 10 } }, grid: { color: "#1e2d4a" } },
+        y: { ticks: { color: "#4a6080", font: { size: 10 } }, grid: { color: "#1e2d4a" }, beginAtZero: true },
+      }
+    }
+  });
+
+  // Type doughnut
+  typeChart = new Chart(document.getElementById("type-chart"), {
+    type: "doughnut",
+    data: { labels: [], datasets: [{ data: [], backgroundColor: COLORS, borderWidth: 0 }] },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: "right", labels: { color: "#c8d8f0", font: { size: 11 }, boxWidth: 12 } }
+      }
+    }
+  });
+
+  // Protocol chart
+  protoChart = new Chart(document.getElementById("proto-chart"), {
+    type: "bar",
+    data: { labels: [], datasets: [{ data: [], backgroundColor: ["#00d4ff","#7c3aed","#ff8c00"], borderWidth: 0 }] },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: "#4a6080" }, grid: { display: false } },
+        y: { ticks: { color: "#4a6080" }, grid: { color: "#1e2d4a" }, beginAtZero: true },
+      }
+    }
+  });
+}
+
+// ── Toast ─────────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.createElement("div");
+  t.className = "toast";
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3000);
+}
+</script>
+</body>
+</html>

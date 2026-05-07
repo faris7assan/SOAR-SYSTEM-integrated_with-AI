@@ -1,0 +1,101 @@
+version: '3.9'
+
+services:
+
+  # ── AegisNDR Engine + API ──────────────────────────────────────────────
+  aegis-engine:
+    build: .
+    container_name: aegis-engine
+    command: python main.py --mock --simulate
+    ports:
+      - "8000:8000"       # FastAPI
+    environment:
+      - CAPTURE_INTERFACE=eth0
+      - RESPONSE_ENABLED=false
+      - LOG_LEVEL=INFO
+      - POSTGRES_URL=postgresql://aegis:aegis@postgres:5432/aegis_ndr
+      - REDIS_HOST=redis
+      - ES_HOST=http://elasticsearch:9200
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - aegis-net
+    restart: unless-stopped
+
+  # ── SOC Dashboard (static file server) ────────────────────────────────
+  aegis-dashboard:
+    image: nginx:alpine
+    container_name: aegis-dashboard
+    ports:
+      - "8080:80"         # Dashboard UI
+    volumes:
+      - ./dashboard:/usr/share/nginx/html:ro
+    networks:
+      - aegis-net
+    restart: unless-stopped
+
+  # ── PostgreSQL ─────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: aegis-postgres
+    environment:
+      POSTGRES_DB:       aegis_ndr
+      POSTGRES_USER:     aegis
+      POSTGRES_PASSWORD: aegis
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - aegis-net
+    restart: unless-stopped
+
+  # ── Redis ──────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: aegis-redis
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    networks:
+      - aegis-net
+    restart: unless-stopped
+
+  # ── Elasticsearch (optional - for log search) ──────────────────────────
+  elasticsearch:
+    image: elasticsearch:8.13.4
+    container_name: aegis-elastic
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
+    networks:
+      - aegis-net
+    restart: unless-stopped
+
+  # ── Kibana (optional - ES dashboard) ──────────────────────────────────
+  kibana:
+    image: kibana:8.13.4
+    container_name: aegis-kibana
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    depends_on:
+      - elasticsearch
+    networks:
+      - aegis-net
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  es_data:
+
+networks:
+  aegis-net:
+    driver: bridge

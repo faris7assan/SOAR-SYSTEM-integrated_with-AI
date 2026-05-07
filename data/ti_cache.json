@@ -1,0 +1,1 @@
+{"cache": {"10.0.0.99": {"is_blacklisted": true, "is_tor": false, "is_c2": false, "reputation_score": 0.0, "categories": ["blacklisted", "private"], "country": "N/A", "isp": "N/A", "confidence": 0.9, "ip": "10.0.0.99"}}, "ttl": {"10.0.0.99": 1778116024.8494992}}
