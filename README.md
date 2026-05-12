@@ -1,11 +1,20 @@
 # 🛡️ AegisNDR — Intelligent Network Detection & Response Platform
 
-> A full-stack, production-grade NDR platform built in Python.
+![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=flat&logo=fastapi&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=flat&logo=docker&logoColor=white)
+![ML](https://img.shields.io/badge/ML-Isolation%20Forest-FF6F00?style=flat&logo=scikit-learn&logoColor=white)
+![MITRE](https://img.shields.io/badge/MITRE-ATT%26CK-red?style=flat)
+![License](https://img.shields.io/badge/License-MIT-green?style=flat)
+
+> A full-stack, production-grade **NDR (Network Detection & Response)** platform built in Python.  
 > Hybrid detection engine · ML anomaly detection · SOAR-lite automation · Real-time SOC dashboard.
+
+**Built by [Hassan Hamed Faris](https://hassanhamedfaris69.base44.app)** — Cybersecurity Engineer | Network Security & Cloud Security
 
 ---
 
-## Architecture
+## 📐 Architecture
 
 ```
 [Packet Capture] → [Flow Generator] → [Feature Engine]
@@ -31,35 +40,54 @@
 
 ---
 
-## Quick Start
+## ⚙️ Environment Setup
+
+Copy the example env file and configure your values before running:
+
+```bash
+cp .env.example .env
+```
+
+Edit `.env` with your credentials. **Never commit your `.env` file.**
+
+---
+
+## 🚀 Quick Start
 
 ### Option 1: Demo Mode (no root, no interface)
+
 ```bash
 pip install -r requirements.txt
 python main.py --mock
 ```
+
 Opens:
-- API: http://localhost:8000/docs
+- API Docs: http://localhost:8000/docs
 - Dashboard: open `dashboard/index.html` in browser
 
 ### Option 2: With Attack Simulation
+
 ```bash
 python main.py --mock --simulate
 ```
+
 Automatically injects: port scan → brute force → DDoS → exfil → beaconing → SQLi → DNS tunneling → lateral movement
 
 ### Option 3: Live Capture (Linux, needs root)
+
 ```bash
 sudo python main.py --interface eth0
 ```
 
 ### Option 4: Docker (full stack)
+
 ```bash
+cp .env.example .env   # configure first
 docker-compose up -d
 ```
-Services:
+
 | Service | URL |
-|---------|-----|
+|---|---|
 | SOC Dashboard | http://localhost:8080 |
 | API Docs | http://localhost:8000/docs |
 | Kibana | http://localhost:5601 |
@@ -67,10 +95,10 @@ Services:
 
 ---
 
-## Detection Capabilities
+## 🔍 Detection Capabilities
 
 | Detection Engine | Threats Detected |
-|-----------------|-----------------|
+|---|---|
 | Rule Engine | Port Scan, Brute Force, DDoS, Data Exfil, Beaconing, Lateral Movement |
 | Signature Engine | SQL Injection, XSS, Command Injection, Directory Traversal, DNS Tunneling |
 | ML Engine (Isolation Forest) | Zero-day anomalies, behavioral deviations, unknown threats |
@@ -79,10 +107,10 @@ Services:
 
 ---
 
-## MITRE ATT&CK Coverage
+## 🗺️ MITRE ATT&CK Coverage
 
 | Tactic | Technique | Detection |
-|--------|-----------|-----------|
+|---|---|---|
 | Reconnaissance | T1046 - Network Service Discovery | Port Scan |
 | Credential Access | T1110 - Brute Force | Brute Force |
 | Impact | T1498 - Network DoS | DDoS |
@@ -94,10 +122,12 @@ Services:
 
 ---
 
-## API Endpoints
+## 🌐 API Endpoints
+
+All endpoints require **JWT Bearer token**. See `.env.example` for default credentials.
 
 | Method | Endpoint | Description |
-|--------|----------|-------------|
+|---|---|---|
 | POST | `/auth/login` | Get JWT token |
 | GET | `/alerts` | List alerts (filterable) |
 | GET | `/alerts/timeline` | Alert timeline for charts |
@@ -110,11 +140,9 @@ Services:
 | GET | `/intel/{ip}` | Threat intelligence lookup |
 | GET | `/stats` | System statistics |
 
-All endpoints require JWT Bearer token. Login: `admin / aegis2024!`
-
 ---
 
-## Writing a Plugin
+## 🔌 Writing a Plugin
 
 Drop a `.py` file in `/plugins/`:
 
@@ -127,7 +155,6 @@ class MyCustomDetector(PluginBase):
     description = "Detects custom threat pattern"
 
     def analyze(self, flow: Flow) -> list:
-        # Your detection logic here
         if flow.dst_port == 1337 and flow.fwd_bytes > 10000:
             return [self.make_alert(
                 flow, AlertType.ANOMALY, 75,
@@ -138,21 +165,26 @@ class MyCustomDetector(PluginBase):
 
 ---
 
-## Scoring Formula
+## 📊 Scoring Formula
 
 ```
 Score = 0.35 × BehavioralScore
       + 0.25 × SeverityScore
       + 0.20 × FrequencyScore
       + 0.20 × ThreatIntelScore
-      + ChainBonus (if correlated attack)
+      + ChainBonus (if correlated attack chain)
 ```
 
-Score thresholds: `LOW < 40 ≤ MEDIUM < 60 ≤ HIGH < 80 ≤ CRITICAL`
+| Range | Severity |
+|---|---|
+| 0 – 39 | 🟢 LOW |
+| 40 – 59 | 🟡 MEDIUM |
+| 60 – 79 | 🟠 HIGH |
+| 80 – 100 | 🔴 CRITICAL |
 
 ---
 
-## Project Structure
+## 🗂️ Project Structure
 
 ```
 aegis-ndr/
@@ -160,6 +192,7 @@ aegis-ndr/
 ├── engine.py                  # Main orchestrator
 ├── config.py                  # All configuration
 ├── models.py                  # Shared data models
+├── .env.example               # Environment variable template
 ├── core/
 │   ├── capture.py             # Packet capture (Scapy + mock)
 │   ├── flow_generator.py      # Packet → Flow (Zeek-style)
@@ -194,10 +227,10 @@ aegis-ndr/
 
 ---
 
-## Tech Stack
+## 🛠️ Tech Stack
 
 | Layer | Technology |
-|-------|-----------|
+|---|---|
 | Packet Capture | Scapy, AF_PACKET, libpcap |
 | ML Detection | scikit-learn (Isolation Forest), NumPy |
 | API | FastAPI, JWT, Pydantic |
@@ -207,13 +240,22 @@ aegis-ndr/
 
 ---
 
-## Dashboard Credentials
+## 🔐 Security Notes
 
-| User | Password | Role |
-|------|----------|------|
-| admin | aegis2024! | Full access + blocking |
-| analyst | analyst123 | Read-only |
+- All credentials are loaded from environment variables via `.env`
+- Default demo credentials are defined in `.env.example` — **change them before any deployment**
+- JWT tokens expire after 24 hours
+- Admin endpoints enforce RBAC role checks
+- IP blocking via `iptables` requires root (Linux only)
 
 ---
 
-Built by Hassan Hamed Faris — AegisNDR v1.0
+## 👤 Author
+
+**Hassan Hamed Faris**  
+Cybersecurity Engineering Student | Future University in Egypt  
+🔗 [Portfolio](https://hassanhamedfaris69.base44.app) · [GitHub](https://github.com/faris7assan) · [LinkedIn](https://linkedin.com/in/hassan-hamed-faris)
+
+---
+
+*AegisNDR v1.0 — Built for the SOC. Powered by ML.*
