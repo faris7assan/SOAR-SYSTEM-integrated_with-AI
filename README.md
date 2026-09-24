@@ -1,79 +1,82 @@
 # AegisNDR
 
-## Network Detection & Response Platform
+## Network Detection & Response Research Platform
 
-AegisNDR is a Python-based cybersecurity research platform combining network-flow analysis, rule/signature detection, anomaly detection, event correlation, threat scoring, threat intelligence, MITRE ATT&CK mapping, and SOC-style response workflows.
+**AegisNDR** is a Python-based cybersecurity research platform for analyzing network activity, detecting suspicious behavior, correlating security events, enriching findings, and presenting SOC-oriented response workflows.
 
-> Status: Educational / experimental. Not presented as production-ready.
+> **Project status:** Educational / experimental. Not presented as production-ready.
 
-## Architecture
+![AegisNDR architecture](docs/architecture.svg)
 
-~~~text
-Packet Capture / Simulation
-          ↓
-Flow Generation → Feature Extraction
-          ↓
-Rules / Signatures / ML
-          ↓
-Event Correlation → Threat Scoring
-          ↓
-Response Workflows
-          ↓
-Storage / SOC Dashboard / API
-~~~
+### What this project demonstrates
 
-## Detection pipeline
+AegisNDR follows a security-analysis pipeline:
 
-- Network-flow and packet-derived features
-- Rule and signature matching
+**Telemetry → feature extraction → detection → correlation → threat scoring → enrichment → SOC workflow**
+
+### Detection capabilities
+
+- Network-flow and packet-derived feature analysis
+- Rule and signature-based detection
 - Isolation Forest anomaly detection
-- Event correlation / attack-chain context
+- Event correlation and attack-chain context
 - Threat scoring
 - Threat-intelligence enrichment
 - MITRE ATT&CK mapping
 - Demonstration response workflows
+- SOC-style API and dashboard components
 
-## Local setup
+### Architecture
 
-~~~bash
+Network Telemetry
+→ Flow Generation / Feature Extraction
+→ Rules / Signatures + ML Anomaly Detection
+→ Event Correlation
+→ Threat Scoring
+→ Threat Intel + MITRE ATT&CK
+→ SOC Dashboard / Response Workflow
+
+### Local setup
+
 cp .env.example .env
 pip install -r requirements.txt
 python main.py --mock
-~~~
 
 Simulation:
-
-~~~bash
 python main.py --mock --simulate
-~~~
 
 Live capture may require elevated privileges:
-
-~~~bash
 sudo python main.py --interface eth0
-~~~
 
-Docker/Compose support is included in the repository.
+Docker / Compose support is included in the repository.
 
-## Security posture
+### Security boundaries
 
-- Never commit .env, API keys, JWT secrets, or credentials.
-- JWT_SECRET must be supplied at deployment time.
+- Keep .env, API keys, JWT secrets, and credentials out of source control.
+- Supply JWT_SECRET through deployment-time secret management.
 - Keep automated response disabled during development.
-- Restrict response actions to explicitly managed/allowlisted assets.
+- Restrict high-impact actions to explicitly managed and authorized assets.
 - Treat ML detections as investigation signals, not proof of compromise.
-- Run live capture and response actions only in authorized environments.
+- Run capture and response functions only in authorized environments.
 
 See SECURITY.md and docs/SECURITY_REVIEW.md.
 
-## Stack
+### Technology
 
-Python, FastAPI, Scapy, scikit-learn, PostgreSQL, Redis, Elasticsearch, JWT/RBAC, Docker, and JavaScript dashboard components.
+Python · FastAPI · Scapy · scikit-learn · PostgreSQL · Redis · Elasticsearch · JWT/RBAC · Docker
 
-## Author
+### My role
 
-Hassan Faris — Cybersecurity Engineer | SOC | Network Security
+**Hassan Faris — Cybersecurity Engineer | SOC | Network Security**
+
+Focused on network detection logic, event analysis, threat scoring, MITRE ATT&CK mapping, and security workflow design.
+
+### Links
 
 - GitHub: https://github.com/faris7assan
 - LinkedIn: https://www.linkedin.com/in/hassan-faris
 - Portfolio: https://hassanhamedfaris69.base44.app
+
+### Authorized-use notice
+
+Use packet capture, scanning, and response capabilities only on systems and networks you own or are explicitly authorized to monitor.
