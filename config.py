@@ -42,7 +42,9 @@ ES_HOST       = os.getenv("ES_HOST", "http://localhost:9200")
 # ─── API ──────────────────────────────────────────────────────────────────────
 API_HOST      = os.getenv("API_HOST", "0.0.0.0")
 API_PORT      = int(os.getenv("API_PORT", 8000))
-JWT_SECRET    = os.getenv("JWT_SECRET", "CHANGE_THIS_IN_PRODUCTION_aegisndr2024")
+JWT_SECRET    = os.getenv("JWT_SECRET")
+if not JWT_SECRET:
+    raise RuntimeError("JWT_SECRET must be set in the environment; refusing to start with an insecure default.")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_MINUTES = 60
 
